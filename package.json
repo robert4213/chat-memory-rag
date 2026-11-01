@@ -1,0 +1,1 @@
+{"name":"st-chat-memory-rag","version":"0.1.1","type":"module","private":true,"scripts":{"test":"node --test tests/*.test.js","check":"node --check index.js && node --check src/core.js && node --check src/ui.js && node --check src/api.js && node --check src/db.js && node --check src/logger.js"}}
