@@ -1,6 +1,6 @@
 export const defaults = {
  enabled:false, debugMode:false, logLimit:300, mode:'content', include:'', exclude:'think,thinking,UpdateVariable', indexUsers:false,
- summaryEnabled:false, summaryTag:'summary', summaryPrompt:'在正文结束后追加 <summary>本轮剧情摘要</summary>。保留人物、地点、关键事件、约定与未解决事项，不加入正文中未发生的事情。',
+ summaryEnabled:false, summaryTag:'summary', summaryInclude:'',summaryExclude:'think,thinking,UpdateVariable', summaryPrompt:'总结提供的本轮剧情。保留人物、地点、关键事件、约定与未解决事项，不加入资料中未发生的事情。',
  mvuEnabled:false, mvuPaths:'', mvuExclude:'', chunkSize:1800, topK:6, threshold:0.25, vectorWeight:0.75, budget:1600, depth:2, position:1, rerankEnabled:false,
  presets:[{id:'default',name:'默认连接',base:'',key:'',model:'',dimensions:0,timeout:20000,retries:1}],
  calls:{document:{preset:'default',overrides:{}},query:{preset:'default',overrides:{}},rerank:{preset:'default',overrides:{}}},

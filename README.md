@@ -1,6 +1,6 @@
 # Chat Memory RAG
 
-SillyTavern UI 扩展，版本 0.1.3。支持 Content/Summary 内容索引、可选 MVU 消息快照、SHA-256 embedding 缓存、关键词与向量混合检索、可选 Rerank、同次聊天请求中的 summary 提示词以及 IndexedDB 导入导出。
+SillyTavern UI 扩展，版本 0.1.4。支持 Content/Summary 内容索引、可选 MVU 消息快照、SHA-256 embedding 缓存、关键词与向量混合检索、可选 Rerank、独立 Text API 摘要生成以及 IndexedDB 导入导出。
 
 ## 安装与使用
 
@@ -9,12 +9,14 @@ SillyTavern UI 扩展，版本 0.1.3。支持 Content/Summary 内容索引、可
 也可将本目录复制到 SillyTavern 的 `public/scripts/extensions/third-party/chat-memory-rag/`（或酒馆当前用户扩展目录）。源码使用浏览器原生 ES modules，无需构建或 npm 安装。
 
 1. 扩展设置中展开原生可折叠的「Chat Memory RAG」栏，点击「打开记忆管理」。折叠栏内也可直接开关扩展、查看索引状态和更新索引。
-2. 在 API / Presets 的 Text、Embedding、Rerank 三张独立配置卡中填写地址、密钥、模型。Embedding 同时服务文档和查询，Rerank 可单独开启。Text 只预留额外解析连接，不自动解析。每卡支持拉取模型、测试当前表单、另存/加载预设。填写后保存设置即可；不再需要 JSON 覆盖或独立绑定查询模型。旧配置自动迁移，查询配置统一采用原文档 Embedding 设置。
-3. 常规中启用；默认只索引助手正文。需要摘要时，选择 Summary 索引模式，并按需开启 Summary 页的生成提示词。
+2. 在 API / Presets 的 Text、Embedding、Rerank 三张独立配置卡中填写地址、密钥、模型。Embedding 同时服务文档和查询，Rerank 可单独开启。Text 用于独立摘要生成。每卡支持拉取模型、测试当前表单、另存/加载预设。填写后保存设置即可；旧配置自动迁移，查询配置统一采用原文档 Embedding 设置。
+3. 常规中启用；默认只索引助手正文。需要摘要时，选择 Summary 索引模式，在 Summary 页开启「使用独立 Text API 生成摘要」，设置摘要输入 include/exclude 标签与提示词。正文过滤后发送独立 /chat/completions 请求，提取摘要输出再 embedding。正常聊天请求不追加摘要提示词。
 4. 内容提取设置 include/exclude，使用预览确认；缺失标签会 warning，不自动回退。
 5. 按需开启 MVU，输入需要的变量路径。下一次正常聊天前读取前一层当前选中回复的消息变量。
 
 Summary 模式下摘要缺失或为空：显示 warning，跳过该内容的 embedding。MVU 快照缺失、为空或字段过滤后为空：静默跳过 embedding，并移除对应旧 MVU 索引；仅 Debug 模式记录跳过事件。
+
+摘要缓存使用过滤后的正文、摘要提示词、输出标签及 Text 模型配置的 hash。修改原文、规则或模型会重新生成。历史聊天首次建立摘要索引时，会为未缓存内容逐层调用 Text API；手动更新索引也遵循缓存。摘要不写回聊天正文。关闭额外摘要生成后，可以提取回复中已有的 summary 标签。
 6. 点击更新索引，然后在检索预览检查结果。正常聊天时自动注入相关历史资料。
 
 API 各用途独立配置；查询与文档须使用相同向量空间。浏览器直接请求 API，服务需要允许当前酒馆来源的跨域请求。密钥保存在本地 IndexedDB，导出时默认移除。所有数据属于当前浏览器与来源地址，换设备请导出/导入。

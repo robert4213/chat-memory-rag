@@ -1,5 +1,5 @@
 import {config} from './core.js';
-export const apiKinds=[{id:'text',title:'Text · 文本生成',note:'额外解析预留。当前仅保存连接与测试；正常聊天中的 Summary 继续使用酒馆当前请求。',path:'chat/completions'},{id:'document',title:'Embedding · 向量嵌入',note:'用于正文、Summary、MVU 与用户查询，统一使用这一套模型。',path:'embeddings'},{id:'rerank',title:'Rerank · 重排序',note:'对召回结果二次排序。可独立开关，失败时保留原排序。',path:'rerank'}];
+export const apiKinds=[{id:'text',title:'Text · 文本生成',note:'用于独立 API 摘要生成，在 Summary 页面开启。人物事实额外解析仍保留在 TODO。',path:'chat/completions'},{id:'document',title:'Embedding · 向量嵌入',note:'用于正文、Summary、MVU 与用户查询，统一使用这一套模型。',path:'embeddings'},{id:'rerank',title:'Rerank · 重排序',note:'对召回结果二次排序。可独立开关，失败时保留原排序。',path:'rerank'}];
 export function migrateApiSettings(settings){
  const s=structuredClone(settings);if(s.apiFormVersion===1)return s;
  const presets=apiKinds.map(k=>({base:'',key:'',model:'',dimensions:0,timeout:20000,retries:1,...(s.calls?.[k.id]?config(s,k.id):{}),id:`api-${k.id}`,name:k.title}));
