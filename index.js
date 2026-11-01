@@ -44,6 +44,8 @@ async function reembedSummary(){
  await indexSource(s,'content',text,key,e,{force:true});logger.write('info','summary.forced',{index:s.index,swipe:s.swipe});
 }
 async function start(){const saved=await db.get('settings','main');settings=migrateSummaryPrompt(migrateApiSettings({...structuredClone(defaults),...saved?.value}));const c=ctx();if(!c)return;logger.write('info','extension.loaded',{version:'0.1.4',debug:settings.debugMode});
+ // Old versions embedded a generated source timestamp; discard these derived records.
+ let timeCleanup=0;for(const r of await db.all('records'))if(r.kind==='content'&&/^来源消息时间（非剧情时间）[：:]/m.test(r.text)){await db.delete('records',r.id);timeCleanup++;}if(timeCleanup)logger.write('info','summary.timestamp_records_invalidated',{count:timeCleanup});
  const events=c.eventTypes||c.event_types;function on(name,fn){if(events?.[name])c.eventSource.on(events[name],fn);}
  for(const name of ['CHAT_CHANGED','MESSAGE_DELETED','MESSAGE_EDITED','MESSAGE_SWIPED'])on(name,()=>{logger.write('debug','lifecycle.event',{name});epoch++;clear();schedule(async()=>{await identify();await reconcile();status.message='需要更新';});});
  on('GENERATION_STARTED',()=>{stopped=false;});on('GENERATION_STOPPED',()=>{stopped=true;epoch++;clear();});
