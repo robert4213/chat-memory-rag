@@ -6,6 +6,6 @@ export class Database {
  all(s){return this.transaction(s,'readonly',o=>o.getAll());}
  put(s,value){return this.transaction(s,'readwrite',o=>o.put(value));}
  delete(s,id){return this.transaction(s,'readwrite',o=>o.delete(id));}
- async export(){const out={version:1};for(const s of stores)out[s]=await this.all(s);for(const r of out.settings){if(r.value?.presets)r.value.presets.forEach(p=>p.key='');if(r.value?.calls)Object.values(r.value.calls).forEach(c=>{if(c.overrides)delete c.overrides.key;});}return out;}
+ async export(){const out={version:1};for(const s of stores)out[s]=await this.all(s);for(const r of out.settings){if(r.value?.presets)r.value.presets.forEach(p=>p.key='');if(r.value?.apiSavedPresets)for(const list of Object.values(r.value.apiSavedPresets))for(const p of list)if(p.config)p.config.key='';if(r.value?.calls)Object.values(r.value.calls).forEach(c=>{if(c.overrides)delete c.overrides.key;});}return out;}
  async import(data){if(data.version!==1)throw new Error('不支持的数据版本');for(const s of stores)if(!Array.isArray(data[s]))throw new Error(`缺少数据表 ${s}`);const db=await this.ready;await new Promise((resolve,reject)=>{const tx=db.transaction(stores,'readwrite');try{for(const s of stores)for(const row of data[s]){if(typeof row.id!=='string')throw new Error('无效记录');tx.objectStore(s).put(row);}}catch(e){tx.abort();reject(e);}tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 }
