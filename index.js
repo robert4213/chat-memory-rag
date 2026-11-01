@@ -5,6 +5,7 @@ import {mount} from './src/ui.js';
 import {Logger} from './src/logger.js';
 import {migrateApiSettings} from './src/api-settings.js';
 import {summaryText} from './src/summary.js';
+import {migrateSummaryPrompt} from './src/summary-rules.js';
 
 const db=new Database();let settings=structuredClone(defaults),epoch=0,queue=Promise.resolve(),stopped=false,busy=false;
 const logger=new Logger(db,()=>settings);
@@ -42,7 +43,7 @@ async function reembedSummary(){
  if(!text)throw new Error('Summary 缺失或为空，跳过 embedding');
  await indexSource(s,'content',text,key,e,{force:true});logger.write('info','summary.forced',{index:s.index,swipe:s.swipe});
 }
-async function start(){const saved=await db.get('settings','main');settings=migrateApiSettings({...structuredClone(defaults),...saved?.value});if(settings.summaryPrompt==='在正文结束后追加 <summary>本轮剧情摘要</summary>。保留人物、地点、关键事件、约定与未解决事项，不加入正文中未发生的事情。')settings.summaryPrompt=defaults.summaryPrompt;const c=ctx();if(!c)return;logger.write('info','extension.loaded',{version:'0.1.4',debug:settings.debugMode});
+async function start(){const saved=await db.get('settings','main');settings=migrateSummaryPrompt(migrateApiSettings({...structuredClone(defaults),...saved?.value}));const c=ctx();if(!c)return;logger.write('info','extension.loaded',{version:'0.1.4',debug:settings.debugMode});
  const events=c.eventTypes||c.event_types;function on(name,fn){if(events?.[name])c.eventSource.on(events[name],fn);}
  for(const name of ['CHAT_CHANGED','MESSAGE_DELETED','MESSAGE_EDITED','MESSAGE_SWIPED'])on(name,()=>{logger.write('debug','lifecycle.event',{name});epoch++;clear();schedule(async()=>{await identify();await reconcile();status.message='需要更新';});});
  on('GENERATION_STARTED',()=>{stopped=false;});on('GENERATION_STOPPED',()=>{stopped=true;epoch++;clear();});
