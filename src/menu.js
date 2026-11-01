@@ -1,0 +1,9 @@
+export function selectInput(draft,chat){const typed=String(draft||'').trim();if(typed)return typed;return String([...chat].reverse().find(m=>m.is_user&&!m.is_system)?.mes||'').trim();}
+export function mountInputMenu(app){
+ const menu=document.querySelector('#extensionsMenu');if(!menu)return;
+ const item=document.createElement('div');item.id='cmrag-reembed-input';item.className='list-group-item flex-container flexGap5 interactable';item.tabIndex=0;item.setAttribute('role','button');item.title='重新调用查询 Embedding，更新检索预览；不发送聊天消息';
+ item.innerHTML='<i class="fa-solid fa-rotate" aria-hidden="true"></i><span>重新 Embedding 当前输入</span>';
+ let running=false;
+ async function run(){if(running)return;const context=globalThis.SillyTavern.getContext();const text=selectInput(document.querySelector('#send_textarea')?.value,context.chat||[]);if(!text){globalThis.toastr?.warning('输入框和聊天中都没有可用的用户输入');return;}const identity=context.getCurrentChatId?.()||context.chatId;running=true;item.setAttribute('aria-disabled','true');item.querySelector('span').textContent='正在重新 Embedding…';app.status.message='正在重新 Embedding 输入';try{await app.api.embed(text,'query',{force:true});const current=globalThis.SillyTavern.getContext();if((current.getCurrentChatId?.()||current.chatId)!==identity){app.logger.write('debug','input.reembedded_chat_changed');return;}await app.search(text);app.logger.write('info','input.reembedded',{characters:text.length});app.status.message='输入 Embedding 与检索预览已更新';globalThis.toastr?.success('已重新 Embedding，可在「检索预览 / 诊断」查看结果');}catch(e){app.status.message='输入 Embedding 失败';app.logger.write('warn','input.reembed_failed',{reason:e.message});globalThis.toastr?.warning(e.message);}finally{running=false;item.removeAttribute('aria-disabled');item.querySelector('span').textContent='重新 Embedding 当前输入';}}
+ item.onclick=run;item.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();run();}};menu.append(item);
+}

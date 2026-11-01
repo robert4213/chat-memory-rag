@@ -1,8 +1,10 @@
 import {extract,mvuText} from './core.js';
 import {renderApiSettings} from './api-settings.js';
 import {Api} from './api.js';
+import {mountInputMenu} from './menu.js';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export async function mount(app){
+ mountInputMenu(app);
  const entry=document.createElement('div');entry.id='cmrag-settings';entry.className='extension_container';
  entry.innerHTML=`<div class="inline-drawer">
   <div class="inline-drawer-toggle inline-drawer-header"><b>Chat Memory RAG</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div></div>
@@ -26,7 +28,7 @@ export async function mount(app){
  async function render(){dialog.innerHTML=`<header><strong>Chat Memory RAG</strong><button data-action="close">关闭</button></header><nav>${pages.map(p=>`<button data-page="${p}" class="${page===p?'active':''}">${p}</button>`).join('')}</nav><main></main><footer><span id="cmrag-state"></span><button data-action="save">保存设置</button></footer>`;const main=dialog.querySelector('main');
  if(page==='概览')main.innerHTML=`<h2>当前聊天记忆</h2><p>${escape(app.status.message)}</p><button data-action="sync">更新索引</button><p>配置 API 后开启扩展。摘要缺失会显示警告。</p><pre>${escape(JSON.stringify(app.dependencies(),null,2))}</pre>${app.status.warnings.slice(0,5).map(w=>`<p class="warning">${escape(w.message)}</p>`).join('')}`;
  if(page==='记忆'){const rows=await app.records();main.innerHTML=`<h2>楼层记忆 · ${rows.length} 条</h2><input id="cmrag-filter" placeholder="筛选内容"><div id="cmrag-records">${rows.sort((a,b)=>a.index-b.index).map(r=>`<details><summary>第 ${r.index} 层 · ${r.kind} · swipe ${r.swipe}</summary><pre>${escape(r.text)}</pre><small>SHA-256 ${escape(r.hash)}</small></details>`).join('')||'<p>尚无索引，先配置 API 并更新索引。</p>'}</div>`;main.querySelector('input').oninput=e=>main.querySelectorAll('details').forEach(d=>d.hidden=!d.textContent.includes(e.target.value));}
- if(page==='检索预览')main.innerHTML='<h2>测试召回</h2><textarea id="cmrag-query" placeholder="输入查询"></textarea><button data-action="search">检索</button><pre id="cmrag-results"></pre>';
+ if(page==='检索预览')main.innerHTML='<h2>测试召回</h2><textarea id="cmrag-query" placeholder="输入查询"></textarea><button data-action="search">检索</button><pre id="cmrag-results">'+escape(app.status.results.map(x=>`楼层 ${x.index} / ${x.kind} / ${x.score.toFixed(3)}\n${x.text}`).join('\n\n')+'\n\n注入预览：\n'+app.status.injection)+'</pre>';
  if(page==='常规')main.innerHTML=field('enabled','启用扩展','checkbox')+field('indexUsers','同时索引用户消息','checkbox')+field('chunkSize','每块最大字符数','number')+'<p>数据保存在当前浏览器 IndexedDB。额外 API 解析尚未启用。</p>';
  if(page==='内容提取')main.innerHTML=`<label>索引模式<select data-field="mode"><option value="content" ${draft.mode==='content'?'selected':''}>Content 正文</option><option value="summary" ${draft.mode==='summary'?'selected':''}>Summary 摘要</option></select></label>`+field('include','Include 标签（逗号分隔，留空使用全文）')+field('exclude','Exclude 标签（逗号分隔）')+'<label>原文预览<textarea id="cmrag-original"></textarea></label><button data-action="preview">查看提取结果</button><pre id="cmrag-preview"></pre>';
  if(page==='Summary')main.innerHTML=field('summaryEnabled','在正常聊天请求中追加摘要生成要求','checkbox')+field('summaryTag','摘要标签')+area('summaryPrompt','注入提示词')+'<p>使用同一次聊天请求，无额外生成 API。索引摘要请选择 Summary 模式。缺失摘要仅警告，不静默回退正文。</p>';
