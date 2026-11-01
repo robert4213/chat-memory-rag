@@ -1,6 +1,6 @@
 # Chat Memory RAG
 
-SillyTavern UI 扩展，版本 0.1.1。支持 Content/Summary 内容索引、可选 MVU 消息快照、SHA-256 embedding 缓存、关键词与向量混合检索、可选 Rerank、同次聊天请求中的 summary 提示词以及 IndexedDB 导入导出。
+SillyTavern UI 扩展，版本 0.1.2。支持 Content/Summary 内容索引、可选 MVU 消息快照、SHA-256 embedding 缓存、关键词与向量混合检索、可选 Rerank、同次聊天请求中的 summary 提示词以及 IndexedDB 导入导出。
 
 ## 安装与使用
 
@@ -8,7 +8,7 @@ SillyTavern UI 扩展，版本 0.1.1。支持 Content/Summary 内容索引、可
 
 也可将本目录复制到 SillyTavern 的 `public/scripts/extensions/third-party/chat-memory-rag/`（或酒馆当前用户扩展目录）。源码使用浏览器原生 ES modules，无需构建或 npm 安装。
 
-1. 扩展设置中点击「Chat Memory RAG → 打开记忆管理」。
+1. 扩展设置中展开原生可折叠的「Chat Memory RAG」栏，点击「打开记忆管理」。折叠栏内也可直接开关扩展、查看索引状态和更新索引。
 2. 在 API / Presets 设置 OpenAI 兼容服务的基础 URL（如 https://host/v1）、模型和密钥，分别绑定文档、查询及可选 Rerank。保存后测试连接。
 3. 常规中启用；默认只索引助手正文。需要摘要时，选择 Summary 索引模式，并按需开启 Summary 页的生成提示词。
 4. 内容提取设置 include/exclude，使用预览确认；缺失标签会 warning，不自动回退。
