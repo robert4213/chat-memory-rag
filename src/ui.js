@@ -7,7 +7,6 @@ import {DEFAULT_SUMMARY_PROMPT} from './summary-rules.js';
 import {config} from './core.js';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export async function mount(app){
- mountInputMenu(app);
  const entry=document.createElement('div');entry.id='cmrag-settings';entry.className='extension_container';
  entry.innerHTML=`<div class="inline-drawer">
   <div class="inline-drawer-toggle inline-drawer-header"><b>Chat Memory RAG</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div></div>
@@ -55,6 +54,8 @@ export async function mount(app){
  dialog.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{collect();page=b.dataset.page;render();});dialog.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>action(b.dataset.action));const file=main.querySelector('#cmrag-import');if(file)file.onchange=async()=>{if(!file.files[0]||!confirm('将合并导入数据，同 ID 记录会被覆盖。继续？'))return;try{await app.db.import(JSON.parse(await file.files[0].text()));alert('已导入；重新打开面板以读取设置，刷新页面使其生效。');}catch(e){alert(e.message);}};
  }
  async function action(a){try{collect();if(a==='close'){dialog.close();return;}if(a==='save'){if(dialog.querySelector(':invalid'))throw Error('请修正无效的覆盖配置');if(!/^[A-Za-z][A-Za-z0-9_-]*$/.test(draft.summaryTag))throw Error('摘要标签格式无效');for(const k of ['chunkSize','topK','budget'])if(!(Number(draft[k])>0))throw Error(`${k} 必须大于零`);if(draft.vectorWeight<0||draft.vectorWeight>1)throw Error('向量权重应在 0 到 1 之间');await app.save(structuredClone(draft));}if(a==='sync')await app.sync();if(a==='preview')dialog.querySelector('#cmrag-preview').textContent=extract(dialog.querySelector('#cmrag-original').value,draft)||'⚠ 没有可索引内容';if(a==='mvu'){const d=globalThis.Mvu?.getMvuData({type:'message',message_id:'latest'});dialog.querySelector('#cmrag-mvu').textContent=d?.stat_data?mvuText(d.stat_data,draft):'未检测到 MVU 快照';}if(a==='search'){const r=await app.search(dialog.querySelector('#cmrag-query').value);dialog.querySelector('#cmrag-results').textContent=r.map(x=>`楼层 ${x.index} / ${x.kind} / ${x.score.toFixed(3)}\n${x.text}`).join('\n\n')+'\n\n注入预览：\n'+app.status.injection;}if(a==='add-preset'){draft.presets.push({id:crypto.randomUUID(),name:'新预设',base:'',key:'',model:'',dimensions:0,timeout:20000,retries:1});await render();}if(a==='export'){const blob=new Blob([JSON.stringify(await app.db.export(),null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='chat-memory-rag.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}if(a==='clear'&&confirm('清理当前聊天的 RAG 索引？原聊天不受影响。'))await app.clear();const state=dialog.querySelector('#cmrag-state');if(state)state.textContent=app.status.message;}catch(e){alert(e.message);}}
- entry.querySelector('[data-entry-open]').onclick=()=>{draft=structuredClone(app.getSettings());render();dialog.showModal();};
+ const openPanel=()=>{draft=structuredClone(app.getSettings());render();if(!dialog.open)dialog.showModal();};
+ entry.querySelector('[data-entry-open]').onclick=openPanel;
+ mountInputMenu({...app,openPanel});
  dialog.addEventListener('close',refreshEntry);
 }

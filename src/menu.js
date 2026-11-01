@@ -2,6 +2,7 @@ export function selectInput(draft,chat){const typed=String(draft||'').trim();if(
 export async function refreshInput(app,text,isCurrent=()=>true){await app.reembedSummary?.();if(!isCurrent())throw new Error('聊天已切换，取消旧输入更新');await app.api.embed(text,'query',{force:true});}
 export function mountInputMenu(app){
  const menu=document.querySelector('#extensionsMenu');if(!menu)return;
+ const open=document.createElement('div');open.id='cmrag-open-panel';open.className='list-group-item flex-container flexGap5 interactable';open.tabIndex=0;open.setAttribute('role','button');open.innerHTML='<i class="fa-solid fa-brain" aria-hidden="true"></i><span>打开 Chat Memory RAG</span>';open.onclick=()=>app.openPanel();open.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();app.openPanel();}};menu.append(open);
  const item=document.createElement('div');item.id='cmrag-reembed-input';item.className='list-group-item flex-container flexGap5 interactable';item.tabIndex=0;item.setAttribute('role','button');item.title='重新调用查询 Embedding，更新检索预览；不发送聊天消息';
  item.innerHTML='<i class="fa-solid fa-rotate" aria-hidden="true"></i><span>重新 Embedding 当前输入</span>';
  let running=false;
