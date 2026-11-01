@@ -16,6 +16,7 @@ export function extract(text,s) {
 }
 export function stable(value){if(Array.isArray(value))return value.map(stable);if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().filter(k=>!k.startsWith('$')).map(k=>[k,stable(value[k])]));return value;}
 export function mvuText(data,s){
+ if(!data||typeof data!=='object')return '';
  const flat=[];const deny=tags(s.mvuExclude),allow=tags(s.mvuPaths);
  function walk(v,p){if(deny.some(x=>p===x||p.startsWith(x+'.')))return;if(v&&typeof v==='object'&&!Array.isArray(v)){for(const k of Object.keys(v).sort())if(!k.startsWith('$'))walk(v[k],p?`${p}.${k}`:k);}else if(!allow.length||allow.some(x=>p===x||p.startsWith(x+'.')))flat.push(`${p}=${JSON.stringify(stable(v))}`);}
  walk(data,'');return flat.join('\n');

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {defaults,extract,mvuText,stable,hash,cosine,modelSpace} from '../src/core.js';
+import {defaults,extract,mvuText,stable,hash,cosine,modelSpace,chunks} from '../src/core.js';
 import {Api} from '../src/api.js';
 test('exclude executes before include; missing summary never falls back',()=>{
  const s={...defaults,mode:'summary'};
@@ -31,3 +31,4 @@ test('concurrent and repeated embeddings share a single request',async()=>{
 test('invalid embeddings do not enter cache',async()=>{
  const api=new Api({get:async()=>null,put:async()=>assert.fail('invalid cached')},()=>defaults);api.request=async()=>({data:[{embedding:[0,0]}]});await assert.rejects(api.embed('x'),/无效向量/);
 });
+test('empty or excluded MVU produces no embedding chunks',()=>{for(const v of [undefined,null,{},{$internal:{x:1}}])assert.deepEqual(chunks(mvuText(v,defaults),1800),[]);assert.deepEqual(chunks(mvuText({角色:{好感:1}},{...defaults,mvuPaths:'不存在'}),1800),[]);});
