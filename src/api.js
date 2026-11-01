@@ -1,8 +1,22 @@
 import {config,hash,modelSpace,validVector} from './core.js';
 export class Api {
  constructor(db,settings,logger=null){this.db=db;this.settings=settings;this.pending=new Map();this.logger=logger;}
- async request(kind,path,body,method='POST'){const c=config(this.settings(),kind);if(!c.base||(method!=='GET'&&!c.model))throw new Error(`${kind}：请配置 API 地址和模型`);let error;
- for(let i=0;i<=Math.max(0,Math.min(3,Number(c.retries)||0));i++){const started=Date.now();this.logger?.write('debug','api.start',{kind,model:c.model,attempt:i+1});const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),Math.max(1000,Math.min(60000,Number(c.timeout)||20000)));try{const url=c.base.replace(/\/+$/,'')+'/'+path;const r=await fetch(url,{method,headers:{'Content-Type':'application/json',...(c.key?{Authorization:`Bearer ${c.key}`}:{})},...(method==='GET'?{}:{body:JSON.stringify({model:c.model,...body})}),signal:controller.signal});if(!r.ok)throw new Error(`${kind} HTTP ${r.status}`);const data=await r.json();this.logger?.write('info','api.success',{kind,model:c.model,attempt:i+1,ms:Date.now()-started,status:r.status});return data;}catch(e){error=e;this.logger?.write('warn','api.failure',{kind,attempt:i+1,ms:Date.now()-started,reason:e.message});}finally{clearTimeout(timer);}}throw error;}
+ async request(kind,path,body,method='POST'){
+  const c=config(this.settings(),kind);if(!c.base||(method!=='GET'&&!c.model))throw new Error(`${kind}：请配置 API 地址和模型`);let error;
+  const callId=crypto.randomUUID(),url=c.base.replace(/\/+$/,'')+'/'+path,payload=method==='GET'?null:{model:c.model,...body};
+  for(let i=0;i<=Math.max(0,Math.min(3,Number(c.retries)||0));i++){
+   const started=Date.now(),attempt=i+1;
+   this.logger?.write('debug','api.request',{callId,kind,model:c.model,attempt,url,method,body:payload},[c.key]);
+   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),Math.max(1000,Math.min(60000,Number(c.timeout)||20000)));
+   try{
+    const r=await fetch(url,{method,headers:{'Content-Type':'application/json',...(c.key?{Authorization:`Bearer ${c.key}`}:{})},...(payload?{body:JSON.stringify(payload)}:{}),signal:controller.signal});
+    const requestId=r.headers?.get('request-id')||r.headers?.get('x-request-id')||null;
+    if(!r.ok){const response=typeof r.text==='function'?await r.text():'';this.logger?.write('debug','api.response',{callId,kind,attempt,status:r.status,requestId,ms:Date.now()-started,response},[c.key]);throw new Error(`${kind} HTTP ${r.status}`);}
+    const data=await r.json();this.logger?.write('debug','api.response',{callId,kind,attempt,status:r.status,requestId,ms:Date.now()-started,response:data},[c.key]);
+    this.logger?.write('info','api.success',{callId,kind,model:c.model,attempt,ms:Date.now()-started,status:r.status,requestId,generationId:data.id,usage:data.usage});return data;
+   }catch(e){error=e;this.logger?.write('warn','api.failure',{callId,kind,attempt,ms:Date.now()-started,reason:e.message},[c.key]);}finally{clearTimeout(timer);}
+  }throw error;
+ }
  async embed(text,kind='document',{force=false}={}){const c=config(this.settings(),kind);const id=await hash(modelSpace(c)+'\n'+text);if(force&&this.pending.has(id))await this.pending.get(id).catch(()=>{});const cached=!force&&await this.db.get('embeddings',id);if(cached){this.logger?.write('debug','embedding.cache_hit',{kind,hash:id});return cached;}if(this.pending.has(id)){this.logger?.write('debug','embedding.shared_request',{kind,hash:id});return this.pending.get(id);}this.logger?.write('debug',force?'embedding.forced':'embedding.cache_miss',{kind,hash:id,characters:text.length});
  const p=(async()=>{const data=await this.request(kind,'embeddings',{input:text,...(Number(c.dimensions)>0?{dimensions:Number(c.dimensions)}:{})});const vector=data.data?.[0]?.embedding;if(!validVector(vector))throw new Error('Embedding 返回了无效向量');const row={id,space:modelSpace(c),vector};await this.db.put('embeddings',row);return row;})();this.pending.set(id,p);try{return await p;}finally{this.pending.delete(id);}}
  async rerank(query,items){const data=await this.request('rerank','rerank',{query,documents:items.map(x=>x.text),top_n:items.length});if(!Array.isArray(data.results))throw new Error('Rerank 返回格式错误');const seen=new Set();return data.results.filter(r=>Number.isInteger(r.index)&&items[r.index]&&Number.isFinite(r.relevance_score)&&!seen.has(r.index)&&(seen.add(r.index))).map(r=>({...items[r.index],score:r.relevance_score}));}
