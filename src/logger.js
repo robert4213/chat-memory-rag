@@ -21,7 +21,7 @@ export class Logger {
  write(level,event,details={},extraSecrets=[]){
   const s=this.settings();if(level==='debug'&&!s.debugMode)return Promise.resolve();
   const secrets=[...(s.presets||[]).map(p=>p.key),...Object.values(s.calls||{}).map(c=>c.overrides?.key),...extraSecrets];
-  const row={id:crypto.randomUUID(),time:new Date().toISOString(),level,event:sanitize(event,secrets),details:sanitize(details,secrets,level==='debug'&&s.debugMode)};
+  const row={id:crypto.randomUUID(),time:new Date().toISOString(),level,event:sanitize(event,secrets),details:sanitize(details,secrets,(level==='debug'&&s.debugMode)||event==='api.http_error')};
   if(s.debugMode){const method=level==='error'?'error':level==='warn'?'warn':'debug';console[method]('[Chat Memory RAG]',row);}
   this.pending=this.pending.catch(()=>{}).then(async()=>{await this.db.put('logs',row);const rows=(await this.db.all('logs')).sort((a,b)=>a.time.localeCompare(b.time)||a.id.localeCompare(b.id));const cap=Math.max(50,Math.min(2000,Number(s.logLimit)||300));for(const old of rows.slice(0,Math.max(0,rows.length-cap)))await this.db.delete('logs',old.id);}).catch(()=>{this.failure='日志存储失败，请检查浏览器存储空间';});
   return this.pending;

@@ -1,13 +1,15 @@
 import {config} from './core.js';
 export const apiKinds=[{id:'text',title:'Text · 文本生成',note:'用于独立 API 摘要生成，在 Summary 页面开启。人物事实额外解析仍保留在 TODO。',path:'chat/completions'},{id:'document',title:'Embedding · 向量嵌入',note:'用于正文、Summary、MVU 与用户查询，统一使用这一套模型。',path:'embeddings'},{id:'rerank',title:'Rerank · 重排序',note:'对召回结果二次排序。可独立开关，失败时保留原排序。',path:'rerank'}];
 export function migrateApiSettings(settings){
- const s=structuredClone(settings);if(s.apiFormVersion===1)return s;
- const presets=apiKinds.map(k=>({base:'',key:'',model:'',dimensions:0,timeout:20000,retries:1,...(s.calls?.[k.id]?config(s,k.id):{}),id:`api-${k.id}`,name:k.title}));
+ const s=structuredClone(settings);
+ if(s.timeoutVersion!==1){for(const p of s.presets||[])p.timeout=300000;for(const call of Object.values(s.calls||{}))if(call.overrides&&'timeout' in call.overrides)call.overrides.timeout=300000;for(const list of Object.values(s.apiSavedPresets||{}))for(const p of list)if(p.config)p.config.timeout=300000;s.timeoutVersion=1;}
+ if(s.apiFormVersion===1)return s;
+ const presets=apiKinds.map(k=>({base:'',key:'',model:'',dimensions:0,timeout:300000,retries:1,...(s.calls?.[k.id]?config(s,k.id):{}),id:`api-${k.id}`,name:k.title}));
  s.presets=presets;s.calls=Object.fromEntries(apiKinds.map((k,i)=>[k.id,{preset:presets[i].id,overrides:{}}]));s.calls.query={preset:s.calls.document.preset,overrides:{}};s.apiFormVersion=1;s.apiSavedPresets=s.apiSavedPresets||{text:[],document:[],rerank:[]};return s;
 }
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function renderApiSettings(main,draft,Api,db,logger){
- main.innerHTML='<p class="cmrag-api-intro">文本生成、向量嵌入与重排序分别配置。测试使用当前表单；保存后用于聊天。</p><div class="cmrag-api-cards"></div>';
+ main.innerHTML='<p class="cmrag-api-intro">文本生成、向量嵌入与重排序分别配置。测试使用当前表单；保存后用于聊天。默认每次请求超时 300 秒（300000 毫秒），可在高级参数中修改，最大 300 秒；重试会另算一次等待时间。</p><div class="cmrag-api-cards"></div>';
  for(const kind of apiKinds){
   const c=draft.presets.find(p=>p.id===draft.calls[kind.id].preset);const card=document.createElement('section');card.className='cmrag-api-card';
   const input=(key,label,type='text',placeholder='')=>`<div class="cmrag-api-row"><label for="cmrag-${kind.id}-${key}">${label}</label><input id="cmrag-${kind.id}-${key}" data-api-key="${key}" type="${type}" value="${esc(c[key])}" placeholder="${esc(placeholder)}" ${type==='number'?'min="0"':''} ${key==='key'?'autocomplete="off"':''}></div>`;
