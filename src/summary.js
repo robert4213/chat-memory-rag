@@ -15,7 +15,7 @@ export async function summaryText(raw,settings,api,db,isCurrent=()=>true,sourceT
  const response=await api.request('text','chat/completions',request);
  if(!isCurrent())return '';
  const rawOutput=response.choices?.[0]?.message?.content;
- const text=timeSummary(typeof rawOutput==='string'?extract(rawOutput,{...settings,mode:'summary',exclude:settings.summaryExclude??settings.exclude}):'',sourceTime);
+ const text=timeSummary(typeof rawOutput==='string'?extract(rawOutput,{...settings,mode:'summary',exclude:settings.summaryExclude??settings.exclude}):'');
  if(text)await db.put('indexState',{id,text,sourceTime});
  return text;
 }

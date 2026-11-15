@@ -2,7 +2,7 @@ import {DEFAULT_SUMMARY_PROMPT} from './summary-rules.js';
 export const defaults = {
  enabled:false, debugMode:false, logLimit:300, mode:'content', include:'', exclude:'think,thinking,UpdateVariable', indexUsers:false,
  summaryEnabled:false, summaryTag:'summary', summaryInclude:'',summaryExclude:'think,thinking,UpdateVariable', summaryPrompt:DEFAULT_SUMMARY_PROMPT,
- mvuEnabled:false, mvuPaths:'', mvuExclude:'', chunkSize:1800, topK:6, threshold:0.25, vectorWeight:0.75, budget:1600, depth:2, position:1, rerankEnabled:false,
+ mvuEnabled:false, mvuPaths:'', mvuExclude:'', chunkSize:1800, topK:6, threshold:0.25, vectorWeight:0.75, budget:1600, depth:2, waitLimit:20, position:1, rerankEnabled:false,
  presets:[{id:'default',name:'默认连接',base:'',key:'',model:'',dimensions:0,timeout:300000,retries:1}],
  calls:{document:{preset:'default',overrides:{}},query:{preset:'default',overrides:{}},rerank:{preset:'default',overrides:{}}},
 };
@@ -23,7 +23,10 @@ export function mvuText(data,s){
  walk(data,'');return flat.join('\n');
 }
 export async function hash(text){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))].map(x=>x.toString(16).padStart(2,'0')).join('');}
-export function chunks(text,size){const out=[];for(let i=0;i<text.length;i+=size)out.push(text.slice(i,i+size));return out;}
+// Never split a UTF-16 surrogate pair (emoji etc.) across two chunks.
+export function chunks(text,size){const out=[];for(let i=0;i<text.length;){let end=Math.min(text.length,i+size);if(end<text.length&&end-i>1&&/[\uD800-\uDBFF]/.test(text[end-1]))end--;out.push(text.slice(i,end));i=end;}return out;}
+// Settle with `work()` or reject after `ms`; `bindCancel` receives a function that rejects early (null once settled).
+export function within(work,ms,message,bindCancel=()=>{}){return new Promise((resolve,reject)=>{let done=false;const settle=(fn,v)=>{if(done)return;done=true;clearTimeout(timer);bindCancel(null);fn(v);};const timer=setTimeout(()=>settle(reject,new Error(message)),ms);bindCancel(reason=>settle(reject,new Error(reason)));Promise.resolve().then(work).then(v=>settle(resolve,v),e=>settle(reject,e));});}
 export function cosine(a,b){if(!a?.length||a.length!==b?.length)return 0;let d=0,x=0,y=0;for(let i=0;i<a.length;i++){d+=a[i]*b[i];x+=a[i]**2;y+=b[i]**2;}return x&&y?d/Math.sqrt(x*y):0;}
 export function lexical(a,b){const tokenize=s=>new Set(String(s).toLowerCase().match(/[a-z0-9_]+|[\u3400-\u9fff]/g)||[]);const q=tokenize(a),d=tokenize(b);return q.size?[...q].filter(x=>d.has(x)).length/q.size:0;}
 export function config(s,kind){const c=s.calls[kind];return {...s.presets.find(p=>p.id===c.preset),...c.overrides};}

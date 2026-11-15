@@ -1,0 +1,7 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {chunks,within} from '../src/core.js';
+test('chunks never split a surrogate pair and keep plain text boundaries',()=>{assert.deepEqual(chunks('abcdef',2),['ab','cd','ef']);const parts=chunks('a😀b😀',2);assert.equal(parts.join(''),'a😀b😀');for(const p of parts)assert.ok(!/[\uD800-\uDBFF]$/.test(p)&&!/^[\uDC00-\uDFFF]/.test(p));assert.deepEqual(chunks('',5),[]);});
+test('within resolves with the work result before the deadline',async()=>{let cancel='unset';assert.equal(await within(async()=>42,1000,'late',fn=>{cancel=fn;}),42);assert.equal(cancel,null);});
+test('within rejects at the deadline while the work keeps running',async t=>{t.mock.timers.enable({apis:['setTimeout']});let finish;const work=new Promise(r=>finish=r);const p=within(()=>work,20000,'超过 20 秒');t.mock.timers.tick(20000);await assert.rejects(p,/超过 20 秒/);finish('done');assert.equal(await work,'done');t.mock.timers.reset();});
+test('within can be cancelled early and late settlement does not clear a newer cancel hook',async()=>{let hook=null;const bind=fn=>{hook=fn;};let finish;const first=within(()=>new Promise(r=>finish=r),60000,'late',bind);hook('生成已停止');await assert.rejects(first,/生成已停止/);assert.equal(hook,null);const second=within(()=>new Promise(()=>{}),60000,'late',bind);const secondHook=hook;finish('old');await new Promise(r=>setTimeout(r,0));assert.equal(hook,secondHook);hook('stop second');await assert.rejects(second,/stop second/);});
