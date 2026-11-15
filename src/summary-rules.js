@@ -16,14 +16,16 @@ const V3_RULES=rules(
  '待续：本轮之后要发生、且资料中已明确的具体事件；每条写清谁、在哪里、做什么具体的事，以及何时或在什么条件下发生；多条用分号分隔；没有则写“无”。',
  `事件项保留原文时间与先后关系，相对时间如“翌日清晨”原样保留，不自行换算。跨时段事件在事件项中分别注明时间。聊天发送时间不等于剧情时间。
 待续不得只用“明天”“之后”“改天”“下次”等相对说法交代时间：本轮剧情时间有明确日期时，在相对说法后用括号注明对应日期，如“明天（3月30日）上午”；没有明确日期时，以本轮已发生的事件为锚点改写，如“港口会面后的次日上午”；没有约定时间的写触发条件，如“收到哈尔滨的电报后”；仍无依据写“时间未定”。不得编造日期，不写“继续努力”“关注后续”这类没有具体事件的内容。`);
-export const LEGACY_DEFAULTS=[V2_RULES+OUTPUT,V3_RULES+OUTPUT];
-export const SUMMARY_RULES=rules(
- '待续：资料中已明确、但本轮尚未发生的具体事件；每条写清谁、在哪里、做什么，以及什么时候或在什么条件下发生；多条用分号分隔；没有则写“无”。不写“继续努力”“关注后续”这类没有具体事件的内容。',
- `时间：保留原文的时间说法与先后顺序，不编造原文没有的日期；聊天发送时间不等于剧情时间。事件项中，跨时段的事件分别注明时间。
+const PENDING='待续：资料中已明确、但本轮尚未发生的具体事件；每条写清谁、在哪里、做什么，以及什么时候或在什么条件下发生；多条用分号分隔；没有则写“无”。不写“继续努力”“关注后续”这类没有具体事件的内容。';
+const TIME_RULE='时间：保留原文的时间说法与先后顺序，不编造原文没有的日期；聊天发送时间不等于剧情时间。事件项中，跨时段的事件分别注明时间。';
+const V4_RULES=rules(PENDING,`${TIME_RULE}
 待续例外：待续要在脱离本轮后仍能看懂，不能只写“明天”“之后”“下次”这类相对说法。本轮剧情时间有明确日期时，保留原话并在括号中补上对应日期，如“明天（3月30日）上午”；没有明确日期时，改写成相对本轮事件的说法，如“会面后的次日上午”；没有约定时间的，写触发条件，如“收到回信后”；仍无依据写“时间未定”。`);
+export const LEGACY_DEFAULTS=[V2_RULES+OUTPUT,V3_RULES+OUTPUT,V4_RULES+OUTPUT];
+export const SUMMARY_RULES=rules(PENDING,`${TIME_RULE}
+待续例外：待续要在脱离本轮后仍能看懂，不能只写“明天”“之后”“下次”这类相对说法，也不能省略时间。紧接本轮、马上进行的行动，写“本轮结束后随即”，有明确日期时一并注明，如“3月30日早晨（本轮结束后随即）”；本轮剧情时间有明确日期时，保留原话并在括号中补上对应日期，如“明天（3月30日）上午”；没有明确日期时，改写成相对本轮事件的说法，如“会面后的次日上午”；没有约定时间的，写触发条件，如“收到回信后”；仍无依据写“时间未定”。`);
 export const DEFAULT_SUMMARY_PROMPT=SUMMARY_RULES+OUTPUT;
 export function migrateSummaryPrompt(s){
- if(s.summaryPromptVersion===4)return s;
+ if(s.summaryPromptVersion===5)return s;
  const old=s.summaryPrompt||'';
  if(s.summaryPromptVersion>=2){
   // Only replace an untouched earlier default; any edited prompt stays exactly as the user wrote it.
@@ -32,5 +34,5 @@ export function migrateSummaryPrompt(s){
   const legacy=['总结提供的本轮剧情。保留人物、地点、关键事件、约定与未解决事项，不加入资料中未发生的事情。','在正文结束后追加 <summary>本轮剧情摘要</summary>。保留人物、地点、关键事件、约定与未解决事项，不加入正文中未发生的事情。'];
   s.summaryPrompt=[DEFAULT_SUMMARY_PROMPT,SUMMARY_RULES,...LEGACY_DEFAULTS,V2_RULES].includes(old)||!old||legacy.includes(old)?DEFAULT_SUMMARY_PROMPT:old+'\n\n'+DEFAULT_SUMMARY_PROMPT;
  }
- s.summaryPromptVersion=4;return s;
+ s.summaryPromptVersion=5;return s;
 }
