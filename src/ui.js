@@ -112,17 +112,18 @@ export async function mount(app){
   const file=main.querySelector('#cmrag-import');if(file)file.onchange=async()=>{if(!file.files[0]||!confirm('将合并导入数据，同 ID 记录会被覆盖。继续？'))return;try{await app.db.import(JSON.parse(await file.files[0].text()));alert('已导入；重新打开面板以读取设置，刷新页面使其生效。');}catch(e){alert(e.message);}};
  }
  // 记忆 page: floor timeline (list) + selected floor (detail); stacks on narrow containers.
- const memoryView={selected:null,status:'all',query:'',view:'list',listTop:0};
+ const memoryView={selected:null,status:'all',query:'',view:'list',listTop:0,showUsers:false};
  const badges={indexed:'已索引',edited:'手动修改',empty:'无内容',excluded:'已删除'};
  async function renderMemory(main,message=''){
-  const floors=await app.floors(),summary=app.getSettings().mode==='summary';
+  // User messages are hidden by default; the toggle brings them back (counts follow what is shown).
+  const all=await app.floors(),floors=memoryView.showUsers?all:all.filter(f=>f.role!=='user'),users=all.filter(f=>f.role==='user').length,summary=app.getSettings().mode==='summary';
   const label=kind=>kind==='mvu'?'MVU 变量':summary?'摘要':'正文';
   const who=f=>`${f.role==='user'?'用户':f.role==='system'?'系统':'回复'}${f.name?' · '+f.name:''}`;
   const preview=f=>f.kinds.content.chunks?f.kinds.content.text:f.kinds.content.note;
   const match=f=>(memoryView.status==='all'||f.state===memoryView.status)&&(!memoryView.query||[f.text,...Object.values(f.kinds).map(k=>k.text)].some(t=>t.includes(memoryView.query)));
   const count=s=>s==='all'?floors.length:floors.filter(f=>f.state===s).length;
   main.innerHTML=`<div class="cmrag-mem" data-view="${memoryView.view}">
-   <div class="cmrag-mem-toolbar"><div class="cmrag-mem-chips" role="group" aria-label="按状态筛选">${[['all','全部'],...Object.entries(badges)].map(([s,t])=>`<button type="button" data-status="${s}" aria-pressed="${memoryView.status===s}">${t}<b>${count(s)}</b></button>`).join('')}</div><input type="search" id="cmrag-filter" placeholder="搜索记忆或原文" aria-label="搜索记忆或原文" value="${escape(memoryView.query)}"></div>
+   <div class="cmrag-mem-toolbar"><div class="cmrag-mem-chips" role="group" aria-label="按状态筛选">${[['all','全部'],...Object.entries(badges)].map(([s,t])=>`<button type="button" data-status="${s}" aria-pressed="${memoryView.status===s}">${t}<b>${count(s)}</b></button>`).join('')}</div><input type="search" id="cmrag-filter" placeholder="搜索记忆或原文" aria-label="搜索记忆或原文" value="${escape(memoryView.query)}"><label class="cmrag-mem-users"><input type="checkbox" class="cmrag-switch" role="switch" data-show-users ${memoryView.showUsers?'checked':''}>用户消息<b>${users}</b></label></div>
    <div class="cmrag-mem-split"><ol class="cmrag-mem-list" aria-label="楼层列表"></ol><section class="cmrag-mem-detail" aria-label="楼层详情"></section></div></div>`;
   const root=main.querySelector('.cmrag-mem'),list=root.querySelector('.cmrag-mem-list'),detail=root.querySelector('.cmrag-mem-detail');
   const setView=v=>{memoryView.view=v;root.dataset.view=v;};
@@ -156,6 +157,7 @@ export async function mount(app){
   }
   root.querySelector('.cmrag-mem-chips').onclick=e=>{const b=e.target.closest('[data-status]');if(!b)return;memoryView.status=b.dataset.status;root.querySelectorAll('[data-status]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));drawList();};
   root.querySelector('#cmrag-filter').oninput=e=>{memoryView.query=e.target.value;drawList();};
+  root.querySelector('[data-show-users]').onchange=e=>{memoryView.showUsers=e.target.checked;memoryView.listTop=0;renderMemory(main);};
   list.onclick=e=>{const b=e.target.closest('.cmrag-mem-row');if(b)select(b.dataset.uid);};
   list.onkeydown=e=>{if(e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;const rows=[...list.querySelectorAll('.cmrag-mem-row')],next=rows[rows.indexOf(document.activeElement)+(e.key==='ArrowDown'?1:-1)];if(next){e.preventDefault();next.focus();select(next.dataset.uid,false);}};
   detail.onclick=e=>{
