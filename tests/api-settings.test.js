@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {defaults,config} from '../src/core.js';
-import {migrateApiSettings} from '../src/api-settings.js';
+import {migrateApiSettings,upsertPreset,removePreset} from '../src/api-settings.js';
 import {Api} from '../src/api.js';
 test('migration separates text/embedding/rerank and preserves existing endpoints',()=>{
  const old=structuredClone(defaults);old.presets[0].base='https://embed.example/v1';old.presets[0].key='secret';old.calls.rerank.overrides={base:'https://rank.example/v1',model:'rank'};
@@ -11,3 +11,5 @@ test('migration separates text/embedding/rerank and preserves existing endpoints
 test('query and document use the same embedding configuration',()=>{const s=migrateApiSettings(defaults);s.presets.find(p=>p.id===s.calls.document.preset).model='embedding-new';assert.equal(config(s,'query').model,'embedding-new');assert.notEqual(s.calls.rerank.preset,s.calls.document.preset);});
 test('existing saved API timeouts upgrade to 300 seconds once and later edits persist',()=>{const old=migrateApiSettings(defaults);delete old.timeoutVersion;old.presets[0].timeout=20000;old.calls.text.overrides.timeout=60000;old.apiSavedPresets.text=[{name:'saved',config:{timeout:20000}}];const s=migrateApiSettings(old);assert.equal(s.presets[0].timeout,300000);assert.equal(s.calls.text.overrides.timeout,300000);assert.equal(s.apiSavedPresets.text[0].config.timeout,300000);s.presets[0].timeout=90000;assert.equal(migrateApiSettings(s).presets[0].timeout,90000);});
 test('model discovery uses selected independent endpoint and GET without a body',async()=>{const s=migrateApiSettings(defaults);s.presets.find(p=>p.id===s.calls.text.preset).base='https://text.example/v1';const original=globalThis.fetch;let request;globalThis.fetch=async(url,options)=>{request={url,options};return {ok:true,status:200,json:async()=>({data:[{id:'model'}]})};};try{const api=new Api({},()=>s);await api.request('text','models',null,'GET');assert.equal(request.url,'https://text.example/v1/models');assert.equal(request.options.method,'GET');assert.equal(request.options.body,undefined);}finally{globalThis.fetch=original;}});
+test('saving a second preset keeps the first; same name overwrites; configs are copied',()=>{const list=[];const c={base:'https://a/v1',model:'m1',key:'k'};upsertPreset(list,'A',c);c.model='m2';upsertPreset(list,'B',c);assert.deepEqual(list.map(p=>p.name),['A','B']);assert.equal(list[0].config.model,'m1');c.model='m3';upsertPreset(list,'A',c);assert.deepEqual(list.map(p=>p.name),['A','B']);assert.equal(list[0].config.model,'m3');assert.equal(list[1].config.model,'m2');});
+test('removing a preset only removes the selected index',()=>{const list=[{name:'A'},{name:'B'},{name:'C'}];removePreset(list,1);assert.deepEqual(list.map(p=>p.name),['A','C']);removePreset(list,5);removePreset(list,-1);removePreset(list,NaN);assert.deepEqual(list.map(p=>p.name),['A','C']);});

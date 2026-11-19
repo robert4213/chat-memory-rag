@@ -50,11 +50,12 @@ export async function mount(app){
   <div class="cmrag-pane"><header class="cmrag-top"><div><h2>${page}</h2><p>${pageInfo[page]}</p></div><button type="button" class="cmrag-close" data-action="close" aria-label="关闭">✕</button></header><main></main><footer class="cmrag-foot"><span id="cmrag-state" role="status">${escape(app.status.busy?'处理中…':app.status.message)}</span>${SAVE_PAGES.has(page)?'<button type="button" class="cmrag-btn-primary" data-action="save">保存设置</button>':''}</footer></div></div>`;
   const main=dialog.querySelector('main');
   if(page==='概览'){
-   const floors=await app.floors().catch(()=>[]),n=st=>floors.filter(f=>f.state===st).length,deps=app.dependencies();
+   // Same default as the 记忆 page: counts exclude user messages.
+   const floors=(await app.floors().catch(()=>[])).filter(f=>f.role!=='user'),n=st=>floors.filter(f=>f.state===st).length,deps=app.dependencies();
    const mode=s.mode==='summary'?(s.summaryEnabled?'Summary 模式 · 独立 Text API 生成摘要':'Summary 模式 · 读取回复里已有的摘要标签'):'Content 模式 · 直接索引正文';
    main.innerHTML=`<div class="cmrag-hero"><div><span class="cmrag-eyebrow">索引状态</span><p class="cmrag-hero-status">${escape(app.status.busy?'处理中…':app.status.message)}</p><p class="cmrag-muted">${mode}${s.mvuEnabled?' · MVU 已开启':''}${s.rerankEnabled?' · Rerank 已开启':''}</p></div><div class="cmrag-actions"><button type="button" class="cmrag-btn-primary" data-action="sync" ${s.enabled?'':'disabled'}>更新索引</button><button type="button" data-goto="记忆">查看记忆</button></div></div>
    ${s.enabled?'':note('扩展还没启用。先在「API / Presets」配置 Embedding，再到「常规」打开开关。','warn')}
-   <div class="cmrag-tiles">${[['楼层',floors.length],['已索引',n('indexed')+n('edited')],['无内容',n('empty')],['已删除',n('excluded')]].map(([t,v])=>`<div class="cmrag-tile"><span>${t}</span><b>${v}</b></div>`).join('')}</div>
+   <div class="cmrag-tiles">${[['楼层（不含用户消息）',floors.length],['已索引',n('indexed')+n('edited')],['无内容',n('empty')],['已删除',n('excluded')]].map(([t,v])=>`<div class="cmrag-tile"><span>${t}</span><b>${v}</b></div>`).join('')}</div>
    ${section('依赖',`<ul class="cmrag-deps">${Object.entries(deps).map(([k,v])=>`<li data-ok="${!!v}"><span class="cmrag-dot" aria-hidden="true"></span><b>${escape(k)}</b><em>${v?'已检测到':'未检测到'}</em></li>`).join('')}</ul>`)}
    ${section('最近警告',app.status.warnings.length?`<ul class="cmrag-warnings">${app.status.warnings.slice(0,8).map(w=>`<li><time>${escape(w.time)}</time><span>${escape(w.message)}</span></li>`).join('')}</ul>`:muted('暂无警告'))}`;
   }
@@ -81,7 +82,7 @@ export async function mount(app){
    +row('mvuPaths','Include 变量路径','逗号或换行分隔；留空包含全部非内部字段',control('mvuPaths','textarea'),true)
    +row('mvuExclude','Exclude 变量路径','这些路径及其子字段不会进入记忆',control('mvuExclude','textarea'),true))
    +section('最新快照',`<div class="cmrag-actions"><button type="button" data-action="mvu">预览最新快照</button></div><pre class="cmrag-code" id="cmrag-mvu" hidden></pre>`,'按当前表单的路径过滤，显示会被索引的内容。');
-  if(page==='API / Presets')renderApiSettings(main,draft,Api,app.db,app.logger);
+  if(page==='API / Presets')renderApiSettings(main,draft,Api,app.db,app.logger,async presets=>{await app.save({...structuredClone(app.getSettings()),apiSavedPresets:structuredClone(presets)});});
   if(page==='检索与注入')main.innerHTML=section('召回',row('topK','最多命中块数','每次最多注入的记忆块数',control('topK','number','min="1"'))
    +row('threshold','召回阈值','分数低于此值的结果会被丢弃，0–1',control('threshold','number','min="0" max="1"'))
    +row('vectorWeight','向量权重','0 只用关键词，1 只用向量相似度',control('vectorWeight','number','min="0" max="1"'))
@@ -123,7 +124,7 @@ export async function mount(app){
   const match=f=>(memoryView.status==='all'||f.state===memoryView.status)&&(!memoryView.query||[f.text,...Object.values(f.kinds).map(k=>k.text)].some(t=>t.includes(memoryView.query)));
   const count=s=>s==='all'?floors.length:floors.filter(f=>f.state===s).length;
   main.innerHTML=`<div class="cmrag-mem" data-view="${memoryView.view}">
-   <div class="cmrag-mem-toolbar"><div class="cmrag-mem-chips" role="group" aria-label="按状态筛选">${[['all','全部'],...Object.entries(badges)].map(([s,t])=>`<button type="button" data-status="${s}" aria-pressed="${memoryView.status===s}">${t}<b>${count(s)}</b></button>`).join('')}</div><input type="search" id="cmrag-filter" placeholder="搜索记忆或原文" aria-label="搜索记忆或原文" value="${escape(memoryView.query)}"><label class="cmrag-mem-users"><input type="checkbox" class="cmrag-switch" role="switch" data-show-users ${memoryView.showUsers?'checked':''}>用户消息<b>${users}</b></label></div>
+   <div class="cmrag-mem-toolbar"><div class="cmrag-mem-chips" role="group" aria-label="按状态筛选">${[['all','全部'],...Object.entries(badges)].map(([s,t])=>`<button type="button" data-status="${s}" aria-pressed="${memoryView.status===s}">${t}<b>${count(s)}</b></button>`).join('')}</div><input type="search" id="cmrag-filter" placeholder="搜索记忆或原文" aria-label="搜索记忆或原文" value="${escape(memoryView.query)}"><label class="cmrag-mem-users"><input type="checkbox" class="cmrag-switch" role="switch" data-show-users ${memoryView.showUsers?'checked':''}>用户消息<b>${users}</b></label><button type="button" class="cmrag-btn-primary cmrag-mem-sync" data-mem-sync ${app.getSettings().enabled?'':'disabled title="扩展未启用"'}>更新索引</button></div>
    <div class="cmrag-mem-split"><ol class="cmrag-mem-list" aria-label="楼层列表"></ol><section class="cmrag-mem-detail" aria-label="楼层详情"></section></div></div>`;
   const root=main.querySelector('.cmrag-mem'),list=root.querySelector('.cmrag-mem-list'),detail=root.querySelector('.cmrag-mem-detail');
   const setView=v=>{memoryView.view=v;root.dataset.view=v;};
@@ -158,6 +159,7 @@ export async function mount(app){
   root.querySelector('.cmrag-mem-chips').onclick=e=>{const b=e.target.closest('[data-status]');if(!b)return;memoryView.status=b.dataset.status;root.querySelectorAll('[data-status]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));drawList();};
   root.querySelector('#cmrag-filter').oninput=e=>{memoryView.query=e.target.value;drawList();};
   root.querySelector('[data-show-users]').onchange=e=>{memoryView.showUsers=e.target.checked;memoryView.listTop=0;renderMemory(main);};
+  root.querySelector('[data-mem-sync]').onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='更新中…';root.setAttribute('aria-busy','true');memoryView.listTop=list.scrollTop;try{await app.sync();}finally{await renderMemory(main,app.status.message);const state=dialog.querySelector('#cmrag-state');if(state)state.textContent=app.status.message;}};
   list.onclick=e=>{const b=e.target.closest('.cmrag-mem-row');if(b)select(b.dataset.uid);};
   list.onkeydown=e=>{if(e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;const rows=[...list.querySelectorAll('.cmrag-mem-row')],next=rows[rows.indexOf(document.activeElement)+(e.key==='ArrowDown'?1:-1)];if(next){e.preventDefault();next.focus();select(next.dataset.uid,false);}};
   detail.onclick=e=>{
