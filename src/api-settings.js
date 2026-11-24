@@ -13,7 +13,8 @@ export function upsertPreset(list,name,config){const row={name,config:structured
 export function removePreset(list,index){if(Number.isInteger(index)&&index>=0&&index<list.length)list.splice(index,1);return list;}
 // persistPresets writes the preset lists immediately, so they survive closing the panel without 保存设置.
 export function renderApiSettings(main,draft,Api,db,logger,persistPresets){
- main.innerHTML='<p class="cmrag-note">三组连接分别配置。「测试连接」用当前表单，点下方「保存设置」后才用于聊天。每次请求默认最多等 300 秒，可在高级参数里调整。</p><div class="cmrag-api-cards"></div>';
+ main.innerHTML=`<section class="cmrag-section"><h3>请求方式</h3><div class="cmrag-row"><div class="cmrag-row-text"><label for="cmrag-api-proxy">通过酒馆代理发送请求</label><p>由 SillyTavern 服务器转发，解决浏览器跨域（CORS）失败。需要在酒馆的 config.yaml 设置 enableCorsProxy: true 并重启。开启后 API 地址由酒馆服务器访问，localhost 指的是酒馆所在的机器。</p></div><div class="cmrag-row-control"><input id="cmrag-api-proxy" type="checkbox" class="cmrag-switch" role="switch" data-field="apiProxy" ${draft.apiProxy?'checked':''}></div></div></section><p class="cmrag-note">三组连接分别配置。「测试连接」用当前表单，点下方「保存设置」后才用于聊天。每次请求默认最多等 300 秒，可在高级参数里调整。</p><div class="cmrag-api-cards"></div>`;
+ main.querySelector('#cmrag-api-proxy').onchange=e=>{draft.apiProxy=e.target.checked;};
  for(const kind of apiKinds){
   const c=draft.presets.find(p=>p.id===draft.calls[kind.id].preset);const card=document.createElement('section');card.className='cmrag-api-card';
   const input=(key,label,type='text',placeholder='')=>`<div class="cmrag-api-row"><label for="cmrag-${kind.id}-${key}">${label}</label><input id="cmrag-${kind.id}-${key}" data-api-key="${key}" type="${type}" value="${esc(c[key])}" placeholder="${esc(placeholder)}" ${type==='number'?'min="0"':''} ${key==='key'?'autocomplete="off"':''}></div>`;

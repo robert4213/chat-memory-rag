@@ -1,24 +1,40 @@
 import {config,hash,modelSpace,validVector} from './core.js';
+// SillyTavern CORS proxy route: /proxy/<absolute url>. Requires enableCorsProxy: true in ST's config.yaml.
+export const proxyUrl=url=>'/proxy/'+url;
+// ST's own headers carry the CSRF token; the proxy strips it before forwarding.
+const stHeaders=()=>{try{return globalThis.SillyTavern?.getContext?.()?.getRequestHeaders?.()||{};}catch{return {};}};
+export function proxyHint(status,body=''){
+ if(status===404&&/CORS proxy is disabled/i.test(body))return '酒馆 CORS 代理未开启：在 SillyTavern 的 config.yaml 设置 enableCorsProxy: true 并重启，或在「API / Presets」关闭「通过酒馆代理」';
+ if(status===403&&/csrf/i.test(body))return '酒馆拒绝了请求（CSRF 校验失败），请刷新页面后重试';
+ if(status===400&&/Circular requests/i.test(body))return 'API 地址指向了酒馆自身，代理不能转发';
+ // The proxy answers a failed upstream fetch with sendStatus(500): body "Internal Server Error".
+ if(status===500&&/^(Internal Server Error)?$/i.test(String(body).trim()))return '酒馆服务器连不上这个地址。代理模式下由酒馆服务器访问 API，localhost 指的是酒馆所在的机器';
+ return '';
+}
 export class Api {
  constructor(db,settings,logger=null){this.db=db;this.settings=settings;this.pending=new Map();this.logger=logger;}
  async request(kind,path,body,method='POST'){
   const c=config(this.settings(),kind),label={text:'Text 摘要/文本生成',document:'Embedding 文档',query:'Embedding 查询',rerank:'Rerank 重排序'}[kind]||kind;
   if(!c.base||(method!=='GET'&&!c.model))throw new Error(`${label}：请配置 API 地址和模型`);let error;
-  const callId=crypto.randomUUID(),url=c.base.replace(/\/+$/,'')+'/'+path,payload=method==='GET'?null:{model:c.model,...body};
+  // apiProxy: send through SillyTavern's CORS proxy (/proxy/<url>, needs enableCorsProxy). The ST server then reaches the API.
+  const proxied=!!this.settings().apiProxy,url=c.base.replace(/\/+$/,'')+'/'+path,target=proxied?proxyUrl(url):url,via=proxied?'sillytavern-proxy':'direct';
+  const callId=crypto.randomUUID(),payload=method==='GET'?null:{model:c.model,...body};
   const timeoutMs=Math.max(1000,Math.min(300000,Number(c.timeout)||300000)),maxAttempts=1+Math.max(0,Math.min(3,Number(c.retries)||0));
   for(let i=0;i<maxAttempts;i++){
    const started=Date.now(),attempt=i+1;
-   this.logger?.write('debug','api.request',{callId,kind,model:c.model,attempt,maxAttempts,timeoutMs,url,method,body:payload},[c.key]);
+   this.logger?.write('debug','api.request',{callId,kind,model:c.model,attempt,maxAttempts,timeoutMs,url,via,method,body:payload},[c.key]);
    let timedOut=false,httpStatus=null,requestId=null;
    const controller=new AbortController();const timer=setTimeout(()=>{timedOut=true;controller.abort();},timeoutMs);
    try{
-    const r=await fetch(url,{method,headers:{'Content-Type':'application/json',...(c.key?{Authorization:`Bearer ${c.key}`}:{})},...(payload?{body:JSON.stringify(payload)}:{}),signal:controller.signal});
+    const r=await fetch(target,{method,headers:{...(proxied?stHeaders():{}),'Content-Type':'application/json',...(c.key?{Authorization:`Bearer ${c.key}`}:{})},...(payload?{body:JSON.stringify(payload)}:{}),signal:controller.signal});
     requestId=r.headers?.get('request-id')||r.headers?.get('x-request-id')||null;httpStatus=r.status;
     if(!r.ok){let response='',responseReadError=null;try{response=typeof r.text==='function'?await r.text():'';}catch(readError){responseReadError=readError.message;}
-     this.logger?.write('error','api.http_error',{callId,kind,label,model:c.model,attempt,maxAttempts,status:r.status,statusText:r.statusText||'',path,requestId,ms:Date.now()-started,response:response||'[empty response body]',responseReadError},[c.key]);
+     this.logger?.write('error','api.http_error',{callId,kind,label,model:c.model,via,attempt,maxAttempts,status:r.status,statusText:r.statusText||'',path,requestId,ms:Date.now()-started,response:response||'[empty response body]',responseReadError},[c.key]);
      let provider='';try{const parsed=JSON.parse(response);provider=String(parsed.error?.message||parsed.message||'');}catch{provider=response.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();}
      if(c.key)provider=provider.split(c.key).join('[REDACTED]');provider=provider.replace(/Bearer\s+\S+/gi,'Bearer [REDACTED]').replace(/\bsk-[\w-]+/g,'[REDACTED]');
-     const failure=new Error(`${label} [${c.model}] /${path}：HTTP ${r.status}${provider?' — '+provider.slice(0,400):'，响应为空'}${responseReadError?'（响应正文读取失败）':''}`);failure.category='http';throw failure;
+     const hint=proxied?proxyHint(r.status,response):'';
+     const detail=`${label} [${c.model}] /${path}：HTTP ${r.status}${provider?' — '+provider.slice(0,400):'，响应为空'}${responseReadError?'（响应正文读取失败）':''}`;
+     const failure=new Error(hint?`${detail.replace(/[.。]\s*$/,'')}。${hint}`:detail);failure.category='http';throw failure;
     }
     let data;try{data=await r.json();}catch(parseError){if(timedOut)throw parseError;const invalid=new Error(`${label} [${c.model}] /${path}：HTTP ${r.status} 响应不是有效 JSON`);invalid.category='invalid_json';throw invalid;}
     this.logger?.write('debug','api.response',{callId,kind,attempt,status:r.status,requestId,ms:Date.now()-started,response:data},[c.key]);
