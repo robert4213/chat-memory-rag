@@ -1,6 +1,7 @@
 import {config,hash,modelSpace,validVector} from './core.js';
 // SillyTavern CORS proxy route: /proxy/<absolute url>. Requires enableCorsProxy: true in ST's config.yaml.
 export const proxyUrl=url=>'/proxy/'+url;
+const redactSecrets=(text,key)=>{let t=String(text);if(key)t=t.split(key).join('[REDACTED]');return t.replace(/Bearer\s+\S+/gi,'Bearer [REDACTED]').replace(/\bsk-[\w-]+/g,'[REDACTED]');};
 // ST's own headers carry the CSRF token; the proxy strips it before forwarding.
 const stHeaders=()=>{try{return globalThis.SillyTavern?.getContext?.()?.getRequestHeaders?.()||{};}catch{return {};}};
 export function proxyHint(status,body=''){
@@ -36,7 +37,13 @@ export class Api {
      const detail=`${label} [${c.model}] /${path}：HTTP ${r.status}${provider?' — '+provider.slice(0,400):'，响应为空'}${responseReadError?'（响应正文读取失败）':''}`;
      const failure=new Error(hint?`${detail.replace(/[.。]\s*$/,'')}。${hint}`:detail);failure.category='http';throw failure;
     }
-    let data;try{data=await r.json();}catch(parseError){if(timedOut)throw parseError;const invalid=new Error(`${label} [${c.model}] /${path}：HTTP ${r.status} 响应不是有效 JSON`);invalid.category='invalid_json';throw invalid;}
+    // Read as text first so a non-JSON body (e.g. an HTML login or gateway page) can be reported.
+    let data,raw=null;try{if(typeof r.text==='function'){raw=await r.text();data=JSON.parse(raw);}else data=await r.json();}catch(parseError){if(timedOut)throw parseError;
+     const body=String(raw??''),type=r.headers?.get?.('content-type')||'',html=/^\s*</.test(body)||/html/i.test(type);
+     this.logger?.write('error','api.invalid_json',{callId,kind,label,model:c.model,via,status:r.status,contentType:type,finalUrl:r.url||target,redirected:!!r.redirected,ms:Date.now()-started,body:body.slice(0,4000)},[c.key]);
+     const head=redactSecrets(body.replace(/\s+/g,' ').trim().slice(0,120),c.key);
+     const where=html?'返回的是网页（HTML）而不是 JSON，请求很可能没有到达 API（被登录页、首页、网关或代理拦下）':head?`响应开头：${head}`:'响应为空';
+     const invalid=new Error(`${label} [${c.model}] /${path}：HTTP ${r.status} 响应不是有效 JSON。${where}${proxied?'。当前通过酒馆代理：请确认酒馆 config.yaml 已设置 enableCorsProxy: true 并重启，或在「API / Presets」关闭代理改为直连':''}。详情见「诊断」日志 api.invalid_json`);invalid.category='invalid_json';throw invalid;}
     this.logger?.write('debug','api.response',{callId,kind,attempt,status:r.status,requestId,ms:Date.now()-started,response:data},[c.key]);
     this.logger?.write('info','api.success',{callId,kind,model:c.model,attempt,ms:Date.now()-started,status:r.status,requestId,generationId:data.id,usage:data.usage});return data;
    }catch(e){const category=e.category||(timedOut?'timeout':e.name==='AbortError'?'aborted':'network');const prefix=`${label} [${c.model}] /${path}`;
