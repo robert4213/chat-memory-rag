@@ -2,7 +2,7 @@ import {DEFAULT_SUMMARY_PROMPT} from './summary-rules.js';
 export const defaults = {
  enabled:false, debugMode:false, logLimit:300, mode:'content', include:'', exclude:'think,thinking,UpdateVariable', indexUsers:false,
  summaryEnabled:false, summaryTag:'summary', summaryInclude:'',summaryExclude:'think,thinking,UpdateVariable', summaryPrompt:DEFAULT_SUMMARY_PROMPT,
- mvuEnabled:false, mvuPaths:'', mvuExclude:'', chunkSize:1800, topK:6, threshold:0.25, vectorWeight:0.75, budget:1600, depth:2, waitLimit:20, position:1, rerankEnabled:false, apiProxy:true,
+ mvuEnabled:false, mvuPaths:'', mvuExclude:'', chunkSize:1800, topK:6, threshold:0.25, vectorWeight:0.75, budget:1600, depth:2, waitLimit:20, position:1, rerankEnabled:false, apiProxy:true, recentRounds:2,
  presets:[{id:'default',name:'默认连接',base:'',key:'',model:'',dimensions:0,timeout:300000,retries:1}],
  calls:{document:{preset:'default',overrides:{}},query:{preset:'default',overrides:{}},rerank:{preset:'default',overrides:{}}},
 };

@@ -1,5 +1,5 @@
 export function selectInput(draft,chat){const typed=String(draft||'').trim();if(typed)return typed;return String([...chat].reverse().find(m=>m.is_user&&!m.is_system)?.mes||'').trim();}
-export async function refreshInput(app,text,isCurrent=()=>true){await app.reembedSummary?.();if(!isCurrent())throw new Error('聊天已切换，取消旧输入更新');await app.api.embed(text,'query',{force:true});}
+export async function refreshInput(app,text,isCurrent=()=>true){await app.reembedSummary?.();if(!isCurrent())throw new Error('聊天已切换，取消旧输入更新');await app.api.embed(app.queryFor?await app.queryFor(text):text,'query',{force:true});}
 export function mountInputMenu(app){
  const menu=document.querySelector('#extensionsMenu');if(!menu)return;
  const open=document.createElement('div');open.id='cmrag-open-panel';open.className='list-group-item flex-container flexGap5 interactable';open.tabIndex=0;open.setAttribute('role','button');open.innerHTML='<i class="fa-solid fa-brain" aria-hidden="true"></i><span>打开 Chat Memory RAG</span>';open.onclick=()=>app.openPanel();open.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();app.openPanel();}};menu.append(open);
